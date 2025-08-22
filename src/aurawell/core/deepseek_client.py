@@ -58,11 +58,18 @@ class DeepSeekClient:
             ValueError: If API key is not provided or found in environment
         """
         # 优先使用阿里云DashScope服务访问DeepSeek模型
-        self.api_key = api_key or os.getenv("QWEN_API") or os.getenv("DASHSCOPE_API_KEY") or os.getenv("DEEP_SEEK_API") or os.getenv("DEEPSEEK_API_KEY")
+        self.api_key = api_key
+        api_key_qwen = os.getenv("QWEN_API")
+        self.api_key = api_key_qwen if (self._validate_api_key(api_key_qwen)) else self.api_key
+        api_key_dashscope = os.getenv("DASHSCOPE_API_KEY")
+        self.api_key = api_key_dashscope if (self._validate_api_key(api_key_dashscope)) else self.api_key
+        api_key_deepseek = os.getenv("DEEP_SEEK_API") or os.getenv("DEEPSEEK_API_KEY")
+        self.api_key = api_key_deepseek if (self._validate_api_key(api_key_deepseek)) else self.api_key
         if not self.api_key:
             raise ValueError(
                 "DeepSeek API key not provided. Set QWEN_API, DASHSCOPE_API_KEY, DEEP_SEEK_API, or DEEPSEEK_API_KEY environment variable."
             )
+        logger.warning(f"API KEY: =============={self.api_key}")
 
         # 支持多种API端点：直接DeepSeek API或阿里云DashScope
         self.base_url = (
@@ -72,7 +79,7 @@ class DeepSeekClient:
             # 根据API Key来源判断使用哪个端点
             self._determine_api_endpoint()
         )
-
+        logger.warning(f"BASE URL: =============={self.base_url}")
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
@@ -80,6 +87,24 @@ class DeepSeekClient:
         )
 
         logger.info(f"DeepSeek client initialized successfully with base_url: {self.base_url}")
+
+    def _validate_api_key(self, api_key: str) -> bool:
+        """
+        验证API Key的基本格式
+        Args:
+            api_key: 要验证的API密钥
+        Returns:
+            bool: 格式是否有效
+        """
+        if not api_key:
+            return False
+        # DeepSeek API Key 格式验证 (通常以 sk- 开头)
+        if api_key.startswith("sk-"):
+            return True
+        # DashScope API Key 格式验证 (通常较长的字符串)
+        elif len(api_key) >= 20 and not api_key.startswith("sk-"):
+            return True
+        return False
 
     def _determine_api_endpoint(self) -> str:
         """
